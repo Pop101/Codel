@@ -42,4 +42,4 @@ Launch the webserver \
 ## Usage
 
 Just connect to the webserver and start guessing! \
-```http://localhost:8484```
+```http://localhost:8787```

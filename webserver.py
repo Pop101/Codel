@@ -121,7 +121,7 @@ if __name__ == "__main__":
         rv = c.post("/submit", json={"code": 'print "hello world"', "other": "data"})
         pass
 
-    print("Starting server on port 8484")
+    print("Starting server on port 8787")
     print(language)
-    serve(app, host="0.0.0.0", port=8484)
+    serve(app, host="0.0.0.0", port=8787)
     # app.run(debug=True)
