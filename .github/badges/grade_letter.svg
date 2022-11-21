@@ -1,0 +1,20 @@
+<svg width="116.5" height="20" viewBox="0 0 1165 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="🛈 Code Grade: A+">
+  <title>🛈 Code Grade: A+</title>
+  <linearGradient id="a" x2="0" y2="100%">
+    <stop offset="0" stop-opacity=".1" stop-color="#EEE"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <mask id="m"><rect width="1165" height="200" rx="30" fill="#FFF"/></mask>
+  <g mask="url(#m)">
+    <rect width="900" height="200" fill="#555"/>
+    <rect width="265" height="200" fill="#3C1" x="900"/>
+    <rect width="1165" height="200" fill="url(#a)"/>
+  </g>
+  <g aria-hidden="true" fill="#fff" text-anchor="start" font-family="Verdana,DejaVu Sans,sans-serif" font-size="110">
+    <text x="60" y="148" textLength="800" fill="#000" opacity="0.25">🛈 Code Grade</text>
+    <text x="50" y="138" textLength="800">🛈 Code Grade</text>
+    <text x="955" y="148" textLength="165" fill="#000" opacity="0.25">A+</text>
+    <text x="945" y="138" textLength="165">A+</text>
+  </g>
+  
+</svg>

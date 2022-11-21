@@ -1,0 +1,20 @@
+<svg width="129.9" height="20" viewBox="0 0 1299 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="≡ Lines per Issue: ∞">
+  <title>≡ Lines per Issue: ∞</title>
+  <linearGradient id="a" x2="0" y2="100%">
+    <stop offset="0" stop-opacity=".1" stop-color="#EEE"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <mask id="m"><rect width="1299" height="200" rx="30" fill="#FFF"/></mask>
+  <g mask="url(#m)">
+    <rect width="1089" height="200" fill="#555"/>
+    <rect width="210" height="200" fill="#08C" x="1089"/>
+    <rect width="1299" height="200" fill="url(#a)"/>
+  </g>
+  <g aria-hidden="true" fill="#fff" text-anchor="start" font-family="Verdana,DejaVu Sans,sans-serif" font-size="110">
+    <text x="60" y="148" textLength="989" fill="#000" opacity="0.25">≡ Lines per Issue</text>
+    <text x="50" y="138" textLength="989">≡ Lines per Issue</text>
+    <text x="1144" y="148" textLength="110" fill="#000" opacity="0.25">∞</text>
+    <text x="1134" y="138" textLength="110">∞</text>
+  </g>
+  
+</svg>
