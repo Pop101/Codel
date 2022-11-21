@@ -1,0 +1,58 @@
+dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+
+    width: 45%;
+    height: fit-content;
+    transform: translate(-50%, -50%);
+
+    z-index: 1050;
+    margin: 2em;
+
+    background: black;
+    background-clip: padding-box;
+    color: white;
+
+    border: solid 5px transparent;
+    border-radius: 2vh;
+}
+
+
+/* Gradient Border */
+.border {
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    right: -5px;
+    bottom: -5px;
+    border-radius: inherit;
+
+    pointer-events: none;
+}
+
+.dialog-close {
+    position: absolute;
+    top: -3rem;
+    right: -3rem;
+
+    width: 1.5rem;
+    height: 1.5rem;
+
+    color: #fff;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+#bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1040;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease-in-out;
+}

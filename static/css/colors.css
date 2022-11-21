@@ -1,0 +1,9 @@
+:root {
+    --color-background: #272727;
+    --color-primary: #f2f2f2;
+    --color-secondary: #b3b3b3;
+    --color-accent: #57a958;
+
+    --gradient-primary: #161417;
+    /* linear-gradient(128deg, rgba(62, 58, 75, 1) 24%, rgba(39, 20, 61, 1) 100%); */
+}

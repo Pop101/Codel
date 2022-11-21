@@ -1,0 +1,851 @@
+name: "Build Badges"
+
+on:
+  push:
+    branches:
+      - "*"
+      - "!badges"
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.txt"
+      - ".gitignore"
+      - "LICENSE"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.txt"
+  schedule:
+    #        ┌───────────── minute (0 - 59)
+    #        │  ┌───────────── hour (0 - 23)
+    #        │  │ ┌───────────── day of the month (1 - 31)
+    #        │  │ │ ┌───────────── month (1 - 12 or JAN-DEC)
+    #        │  │ │ │ ┌───────────── day of the week (0 - 6 or SUN-SAT)
+    #        │  │ │ │ │
+    #        │  │ │ │ │
+    #        │  │ │ │ │
+    #        *  * * * *
+    - cron: "30 1 * * 0"
+
+jobs:
+  CodeQL:
+    outputs:
+      errors: ${{ steps.count.outputs.errors }}
+      warnings: ${{ steps.count.outputs.warnings }}
+      notes: ${{ steps.count.outputs.notes }}
+    # CodeQL runs on ubuntu-latest, windows-latest, and macos-latest
+    runs-on: ubuntu-latest
+
+    permissions:
+      # required for all workflows
+      security-events: write
+
+      # only required for workflows in private repositories
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Initializes the CodeQL tools for scanning.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        continue-on-error: true
+        # Override language selection by uncommenting this and choosing your languages
+        # with:
+        #   languages: go, javascript, csharp, python, cpp, java
+
+      # Autobuild attempts to build any compiled languages (C/C++, C#, or Java).
+      # If this step fails, then you should remove it and run the build manually (see below).
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+        continue-on-error: true
+
+      # ℹ️ Command-line programs to run using the OS shell.
+      # 📚 https://git.io/JvXDl
+
+      # ✏️ If the Autobuild fails above, remove it and uncomment the following
+      #    three lines and modify them (or add more) to build your code if your
+      #    project uses a compiled language
+
+      #- run: |
+      #     make bootstrap
+      #     make release
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        continue-on-error: true
+        with:
+          add-snippets: true
+          wait-for-processing: true
+
+      # Count the errors
+      - name: Detect Errors
+        id: count
+
+        if: ${{ success() }}
+
+        shell: bash
+        run: |
+          declare repo=$(echo ${{ github.repository }} | awk -F'/' '{print $2}')
+          declare results=$(cat /home/runner/work/**/*.sarif | jq -r '.runs[].results[].ruleId')
+          declare resultsArray=($results)
+
+          echo "${resultsArray[*]}"
+          declare errorCount=0
+          declare warningCount=0
+          declare noteCount=0
+
+          # TODO: see if we can count occurrences instead of using a for loop
+          for var in "${resultsArray[@]}"
+          do
+            severity=$(cat /home/runner/work/**/*.sarif | jq -r '.runs[].tool.driver.rules[] | select(.id=="'$var'").properties."problem.severity"')
+            echo "${var} | $severity"
+            if [ "$severity" == "warning" ]; then let warningCount+=1; fi
+            if [ "$severity" == "error" ]; then let errorount+=1; fi
+            if [ "$severity" == "note" ]; then let noteount+=1; fi
+          done
+
+          echo ""
+          echo "Error Count: $errorCount"
+          echo "Warning Count: $warningCount"
+          echo "Note Count: $noteCount"
+          echo ""
+
+          echo "errors=$errorCount" >> $GITHUB_OUTPUT 
+          echo "warnings=$warningCount" >> $GITHUB_OUTPUT 
+          echo "notes=$noteCount" >> $GITHUB_OUTPUT
+
+  Make:
+    # A job to execute the current make file and count the number of warnings
+    # and errors.
+
+    outputs:
+      warnings: ${{ steps.count.outputs.warnings }}
+      errors: ${{ steps.count.outputs.errors }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+
+  GitCounts:
+    # A job to count several statistics
+    # Counts:
+    #   - commits
+    #   - merges
+    #   - branches
+    #   - total lines of code
+    #   - contributors
+    #   - open issues
+    name: "Git Statistics"
+
+    outputs:
+      commits: ${{ steps.commits.outputs.count }}
+      merges: ${{ steps.commits.outputs.merges }}
+
+      branches: ${{ steps.branches.outputs.branches }}
+      contributors: ${{ steps.contributors.outputs.contrib }}
+      issues: ${{ steps.issues.outputs.count }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: "File List"
+        id: files
+        run: |
+          echo "files<<EOFDELIM" >> $GITHUB_OUTPUT
+          echo "$(git ls-tree --full-tree --name-only -r HEAD | grep -v "^.github/")" >> $GITHUB_OUTPUT
+          echo "EOFDELIM" >> $GITHUB_OUTPUT
+
+      - name: "Issue Count"
+        id: issues
+        uses: kazupon/issue-count-action@master
+        with:
+          github-token: ${{ github.token }}
+          state: open
+
+      - name: "Commit & Merge Count"
+        id: commits
+        shell: bash
+        run: |
+          declare COUNT_NO_MERGES=$(git rev-list --no-merges --count HEAD)
+          declare COUNT_MERGES=$(git rev-list --count HEAD)
+          declare MERGES=$(($COUNT_MERGES - $COUNT_NO_MERGES))
+
+          echo "count=$COUNT_NO_MERGES" >> $GITHUB_OUTPUT 
+          echo "merges=$MERGES" >> $GITHUB_OUTPUT
+
+      - name: "Commits this year"
+        id: commits-year
+        run: |
+          declare YEAR=$(date +%Y)
+          declare COUNT=$(git rev-list --count --since="$YEAR-01-01" HEAD)
+
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+
+      - name: "Branch Count"
+        id: branches
+        run: |
+          declare COUNT=$(git branch --list --no-color | wc -l)
+          echo "branches=$COUNT" >> $GITHUB_OUTPUT
+
+      - name: "Contributor Count"
+        id: contributors
+        run: |
+          git shortlog -s HEAD
+          echo "contrib=$(git shortlog -s HEAD | wc -l)" >> $GITHUB_OUTPUT
+
+  FileStats:
+    # A job to scan files for interesting statistics
+    # Counts:
+    #   - words (seperated by spaces, punct, or newline, nums)
+    #   - lines
+    #   - chars
+    #   - unique words
+    #   - unique chars
+    #   - alphabetical chars
+    #   - numerical chars
+    #   - punctuation chars
+    #   - whitespace chars
+
+    name: "File Statistics"
+
+    outputs:
+      files: ${{ steps.files.outputs.files }}
+      text_files: ${{ steps.files.outputs.text_files }}
+      file_count: ${{ steps.files.outputs.file_count }}
+      text_file_count: ${{ steps.files.outputs.text_file_count }}
+      lines: ${{ steps.lines.outputs.lines }}
+      words: ${{ steps.words.outputs.words }}
+      chars: ${{ steps.words.outputs.chars }}
+      avg_word_length: ${{ steps.words.outputs.avg_word_length }}
+      unique_words: ${{ steps.words.outputs.unique_words }}
+      swear_words: ${{ steps.words.outputs.swear_count }}
+
+      alpha_chars: ${{ steps.char_count.outputs.alpha_chars }}
+      numeric_chars: ${{ steps.char_count.outputs.numeric_chars }}
+      punct_chars: ${{ steps.char_count.outputs.punct_chars }}
+      special_chars: ${{ steps.char_count.outputs.special_chars }}
+      whitespace_chars: ${{ steps.char_count.outputs.whitespace_chars }}
+      meaningful_whitespace: ${{ steps.char_count.outputs.meaningful_whitespace }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+
+      - name: "File List"
+        id: files
+        run: |
+          shopt -s expand_aliases
+          alias FILES="git ls-tree --full-tree --name-only -r HEAD | grep -v '^.github/'"
+          alias TEXTFILES="FILES | file -if - | grep -v "binary" | cut -d: -f1"
+
+          echo "files<<EOFDELIM" >> $GITHUB_OUTPUT 
+          echo $(FILES) >> $GITHUB_OUTPUT
+          echo "EOFDELIM" >> $GITHUB_OUTPUT
+
+          echo "text_files<<EOFDELIM" >> $GITHUB_OUTPUT 
+          echo $(TEXTFILES) >> $GITHUB_OUTPUT
+          echo "EOFDELIM" >> $GITHUB_OUTPUT
+
+          echo "file_count=$(FILES | wc -l)" >> $GITHUB_OUTPUT
+          echo "text_file_count=$(TEXTFILES | wc -l)" >> $GITHUB_OUTPUT\
+
+          echo "Found \`$(FILES | wc -l)\` tracked files" >> $GITHUB_STEP_SUMMARY
+          echo "Found \`$(TEXTFILES | wc -l)\` textlike files" >> $GITHUB_STEP_SUMMARY
+
+          echo "List of tracked files:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo $(TEXTFILES) >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: "Line Count"
+        id: lines
+        env:
+          FILES: ${{ steps.files.outputs.text_files }}
+        run: |
+          echo "lines=$(echo $FILES | xargs cat | wc -l)" >> $GITHUB_OUTPUT
+
+          echo "Found \`$(echo $FILES | xargs cat | wc -l)\` lines of text" >> $GITHUB_STEP_SUMMARY
+
+      - name: "Word Count"
+        id: words
+        env:
+          FILES: ${{ steps.files.outputs.text_files }}
+        run: |
+          declare RAW_WORDS=$(echo $FILES | xargs cat | tr '\n' ' ' | sed -E 's/[0-9]|[[:punct:]]/ /g; s/[[:space:]]+/ /g')
+          declare WORDS=$(echo $RAW_WORDS | wc -w)
+          declare CHARS=$(echo $RAW_WORDS | wc -m)
+
+          declare AVG_WORD_LENGTH=$(( 100 * ($CHARS - $WORDS) / $WORDS ))
+
+          declare UNIQUE_WORDS=$(echo $RAW_WORDS | awk '{print tolower($0)}' | tr ' ' '\n' | sort | uniq | wc -l)
+          # UNIQUE_WORDS=$(($UNIQUE_WORDS - 1))
+
+          declare SWEAR_COUNT=$(echo $RAW_WORDS | tr ' ' '\n' | grep -cEi "^[fuck|shit|bitch|cunt|pussy|dick|cock|bastard|twat|damn|ass|arse|prick]$")
+
+          echo "words=$WORDS" >> $GITHUB_OUTPUT
+          echo "chars=$CHARS" >> $GITHUB_OUTPUT
+          echo "avg_word_length=$AVG_WORD_LENGTH" >> $GITHUB_OUTPUT
+          echo "unique_words=$UNIQUE_WORDS" >> $GITHUB_OUTPUT
+          echo "swear_count=$SWEAR_COUNT" >> $GITHUB_OUTPUT
+
+          echo "Average Word Length: \`$AVG_WORD_LENGTH\`" >> $GITHUB_STEP_SUMMARY
+          echo "Found \`$WORDS\` words" >> $GITHUB_STEP_SUMMARY
+          echo "Of which, \`$UNIQUE_WORDS\` are unique" >> $GITHUB_STEP_SUMMARY
+          echo "and \`$SWEAR_COUNT\` are swears" >> $GITHUB_STEP_SUMMARY
+
+      - name: "Character Count"
+        id: char_count
+        env:
+          FILES: ${{ steps.files.outputs.text_files }}
+        run: |
+          declare ALPHA_CHARS=$(echo $FILES | xargs cat | tr -cd '[:alpha:]' | wc -c)
+          declare NUMERIC_CHARS=$(echo $FILES | xargs cat | tr -cd '[:digit:]' | wc -c)
+          declare PUNCT_CHARS=$(echo $FILES | xargs cat | tr -cd '[:punct:]' | wc -c)
+          declare SPECIAL_CHARS=$(echo $FILES | xargs cat | tr -cd '[:graph:]' | wc -c)
+          declare WHITESPACE_CHARS=$(echo $FILES | xargs cat | tr -cd '[:space:]' | wc -c)
+          declare MEANINGFUL_WHITESPACE=$(echo $FILES | xargs cat | egrep -c '[^[:space:]][[:space:]]+[^[:space:]]')
+
+          echo "alpha_chars=$ALPHA_CHARS" >> $GITHUB_OUTPUT
+          echo "numeric_chars=$NUMERIC_CHARS" >> $GITHUB_OUTPUT
+          echo "punct_chars=$PUNCT_CHARS" >> $GITHUB_OUTPUT
+          echo "special_chars=$SPECIAL_CHARS" >> $GITHUB_OUTPUT
+          echo "whitespace_chars=$WHITESPACE_CHARS" >> $GITHUB_OUTPUT
+          echo "meaningful_whitespace=$MEANINGFUL_WHITESPACE" >> $GITHUB_OUTPUT
+
+  GenBadges:
+    # A job to generate badges for the current repository.
+    # Badges are generated based on all the values calculated above:
+    # - Number of commits
+    # - Number of contributors
+    # - Number of open issues
+    # - Number of lines of code
+    needs: [CodeQL, Make, GitCounts, FileStats]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v3
+
+      # If a task fails, we want to set the resulting variable to 0
+      - name: "Defaults"
+        id: defaults
+        env:
+          MK_WARNINGS: ${{ needs.Make.outputs.warnings }}
+          MK_ERRORS: ${{ needs.Make.outputs.errors }}
+
+          QL_NOTES: ${{ needs.CodeQL.outputs.notes }}
+          QL_WARNINGS: ${{ needs.CodeQL.outputs.warnings }}
+          QL_ERRORS: ${{ needs.CodeQL.outputs.errors }}
+
+        run: |
+          declare MK_WARNINGS=${MK_WARNINGS:-0}
+          declare MK_ERRORS=${MK_ERRORS:-0}
+
+          declare QL_NOTES=${QL_NOTES:-0}
+          declare QL_WARNINGS=${QL_WARNINGS:-0}
+          declare QL_ERRORS=${QL_ERRORS:-0}
+
+          echo "warnings=$MK_WARNINGS" >> $GITHUB_OUTPUT
+          echo "errors=$MK_ERRORS" >> $GITHUB_OUTPUT
+
+          echo "notes=$QL_NOTES" >> $GITHUB_OUTPUT
+          echo "warnings=$QL_WARNINGS" >> $GITHUB_OUTPUT
+          echo "errors=$QL_ERRORS" >> $GITHUB_OUTPUT
+
+      - name: "Calculations"
+        id: calcs
+        env:
+          LINES: ${{ needs.FileStats.outputs.lines }}
+          PR_ISSUES: ${{ needs.GitCounts.outputs.issues }}
+
+          MK_WARNINGS: ${{ steps.defaults.outputs.warnings }}
+          MK_ERRORS: ${{ steps.defaults.outputs.errors }}
+
+          QL_NOTES: ${{ steps.defaults.outputs.notes }}
+          QL_WARNINGS: ${{ steps.defaults.outputs.warnings }}
+          QL_ERRORS: ${{ steps.defaults.outputs.errors }}
+
+          UNIQUE_WORDS: ${{ needs.FileStats.outputs.unique_words }}
+          WORDS: ${{ needs.FileStats.outputs.words }}
+          SWEARS: ${{ needs.FileStats.outputs.swear_words }}
+
+          CHARS: ${{ needs.FileStats.outputs.chars }}
+          ALPHA_CHARS: ${{ needs.FileStats.outputs.alpha_chars }}
+          NUMERIC_CHARS: ${{ needs.FileStats.outputs.numeric_chars }}
+          PUNCT_CHARS: ${{ needs.FileStats.outputs.punct_chars }}
+          SPECIAL_CHARS: ${{ needs.FileStats.outputs.special_chars }}
+          WHITESPACE_CHARS: ${{ needs.FileStats.outputs.whitespace_chars }}
+          M_WHITESPACE_CHARS: ${{ needs.FileStats.outputs.meaningful_whitespace }}
+
+          FILES: ${{ needs.FileStats.outputs.files }}
+          TEXTFILES: ${{ needs.FileStats.outputs.text_files }}
+
+        run: |
+          mkdir -p ./.github/badges
+
+          declare LINES_PER_PR="∞"
+          if [ $PR_ISSUES -gt 0 ] && [ $LINES -gt 0 ]; then
+            LINES_PER_PR=$(($LINES / $PR_ISSUES))
+          fi
+
+          declare TOTAL_ERRORS=$(($QL_ERRORS + $MK_ERRORS))
+          declare TOTAL_WARNINGS=$(($TOTAL_ERRORS + $MK_WARNINGS + $QL_WARNINGS))
+
+          declare WARNS_PERCENT=0
+          if [ $LINES -gt 0 ]; then
+            WARNS_PER_LINE=$(( 100 * $TOTAL_WARNINGS / $LINES))
+          fi
+
+          declare CLEAN_PERCENT=100
+          if [ $LINES -gt 0 ]; then
+            CLEAN_PERCENT=$(( $LINES - $TOTAL_WARNINGS - $QL_NOTES ))
+            CLEAN_PERCENT=$(( 100 * $CLEAN_PERCENT / $LINES ))
+          fi
+
+          declare DRY_SCORE=100
+          if [ $WORDS -gt 0 ]; then
+            DRY_SCORE=$(( 100 * $UNIQUE_WORDS / $WORDS ))
+          fi
+
+          declare SWEAR_SCORE=0
+          if [ $WORDS -gt 0 ]; then
+            SWEAR_SCORE=$(( 100 * $SWEARS / $WORDS ))
+          fi
+
+          declare MEANINGLESS_WHITESPACE=$(( $WHITESPACE_CHARS - $M_WHITESPACE_CHARS ))
+          declare AVG_LINE_LEN=0
+          if [ $CHARS -gt 0 ]; then
+            AVG_LINE_LEN=$(( ($CHARS - $MEANINGLESS_WHITESPACE) / $LINES ))
+          fi
+
+          # "Ideal" line length is 20 characters (arbitrary)
+          # Calculate as follows: 100-(x-20)^1.05 (arbitrary)
+          declare WHITESPACE_SCORE=100
+          if [ $AVG_LINE_LEN -gt 20 ]; then
+            WHITESPACE_SCORE=$( echo "scale=10; (100 - ( $AVG_LINE_LEN - 20 ) ^ 1.05)" | bc )
+            WHITESPACE_SCORE=$( printf "%.0f" $WHITESPACE_SCORE )
+          fi
+
+          declare ASS_SCORE=100
+          declare ASS_STRING="∞"
+          if [ $M_WHITESPACE_CHARS -gt 0 ]; then
+            ASS_SCORE=$(( 100 * $WHITESPACE_CHARS / $M_WHITESPACE_CHARS))
+            ASS_STRING=$(echo "scale=2; $WHITESPACE_CHARS / $M_WHITESPACE_CHARS" | bc )
+          fi
+
+          declare SANITY_SCORE=100
+          if [ $CHARS -gt 0 ]; then
+            SANITY_SCORE=$(( 100 * $ALPHA_CHARS / $CHARS ))
+          fi
+
+          # Count number of pictures
+          declare PICS=$(echo $FILES | egrep -c '\.(png|jpg|jpeg|gif|svg|webp)$')
+
+          declare PIC_STR_1="⍓ Images"
+          declare PIC_STR_2="$PICS"
+          if [ $PICS -eq 0 ]; then
+            PIC_STR_1="No Pics"
+            PIC_STR_2="No Clicks"
+          fi
+
+          echo "avg_line_len=$AVG_LINE_LEN" >> $GITHUB_OUTPUT
+          echo "lines-per-pr=$LINES_PER_PR" >> $GITHUB_OUTPUT
+          echo "total-errors=$TOTAL_ERRORS" >> $GITHUB_OUTPUT
+          echo "total-warnings=$TOTAL_WARNINGS" >> $GITHUB_OUTPUT
+          echo "warnings-percent=$WARNS_PERCENT" >> $GITHUB_OUTPUT
+          echo "clean-percent=$CLEAN_PERCENT" >> $GITHUB_OUTPUT
+          echo "dry_score=$DRY_SCORE" >> $GITHUB_OUTPUT
+          echo "swear_score=$SWEAR_SCORE" >> $GITHUB_OUTPUT
+          echo "sanity_score=$SANITY_SCORE" >> $GITHUB_OUTPUT
+
+          echo "whitespace_score=$WHITESPACE_SCORE" >> $GITHUB_OUTPUT
+          echo "whitespace_size=$ASS_SCORE" >> $GITHUB_OUTPUT
+          echo "whitespace_size_str=$ASS_STRING" >> $GITHUB_OUTPUT
+
+          echo "pics=$PICS" >> $GITHUB_OUTPUT
+          echo "pic_str_1=$PIC_STR_1" >> $GITHUB_OUTPUT
+          echo "pic_str_2=$PIC_STR_2" >> $GITHUB_OUTPUT
+
+          echo "## Calculated Values" >> $GITHUB_STEP_SUMMARY
+          echo "words=$WORDS" >> $GITHUB_STEP_SUMMARY
+          echo "unique_words=$UNIQUE_WORDS" >> $GITHUB_STEP_SUMMARY
+          echo "dry_score=$DRY_SCORE" >> $GITHUB_STEP_SUMMARY
+          echo "swear_score=$SWEAR_SCORE" >> $GITHUB_STEP_SUMMARY
+
+      - name: "Generate Commit Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "🗸 Commits"
+          status: ${{ needs.GitCounts.outputs.commits }}
+          color: blue
+          path: .github/badges/commit_count.svg
+
+      - name: "Generate Contributor Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⩆ Contributors"
+          status: ${{ needs.GitCounts.outputs.contributors }}
+          color: green
+          path: .github/badges/contributor_count.svg
+
+      - name: "Generate Merges Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⤞ Merges"
+          status: ${{ needs.GitCounts.outputs.merges }}
+          color: blue
+          path: .github/badges/merge_count.svg
+
+      - name: "Generate PR Issue Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⤫ PR Issues"
+          status: ${{ needs.GitCounts.outputs.issues }}
+          color: red
+          path: .github/badges/pr_issue_count.svg
+
+      - name: "Generate Lines of Code Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "🖋 Lines of Code"
+          status: ${{ needs.FileStats.outputs.lines }}
+          color: blue
+          path: .github/badges/lines_of_code.svg
+
+      - name: "Generate Warnings Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "🏲 Warnings"
+          status: ${{ steps.calcs.outputs.total-warnings }}
+          color: yellow
+          path: .github/badges/warnings_count.svg
+
+      - name: "Generate Error Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "❢ Errors"
+          status: ${{ steps.calcs.outputs.total-errors }}
+          color: red
+          path: .github/badges/errors_count.svg
+
+      - name: "Generate Lines per PR Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "≡ Lines per Issue"
+          status: ${{ steps.calcs.outputs.lines-per-pr }}
+          color: blue
+          path: .github/badges/lines_per_pr.svg
+
+      - name: "Generate Grade Percent Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "𝄎 Code Grade"
+          status: "${{ steps.calcs.outputs.clean-percent }}%"
+          color: ${{
+            steps.calcs.outputs.clean-percent > 90 && 'green'              ||
+            steps.calcs.outputs.clean-percent > 80 && 'yellow,green'       ||
+            steps.calcs.outputs.clean-percent > 70 && 'yellow'             ||
+            steps.calcs.outputs.clean-percent > 60 && 'orange,yellow'      ||
+            steps.calcs.outputs.clean-percent > 50 && 'orange'             ||
+            steps.calcs.outputs.clean-percent > 40 && 'red,orange'         ||
+            steps.calcs.outputs.clean-percent > 30 && 'red,red,orange'     ||
+            steps.calcs.outputs.clean-percent > 20 && 'red,red,red,orange' ||
+            'red' }}
+          path: .github/badges/grade_percent.svg
+
+      - name: "Generate Letter Grade Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "🛈 Code Grade"
+          status: ${{
+            steps.calcs.outputs.clean-percent > 90 && 'A+'    ||
+            steps.calcs.outputs.clean-percent > 80 && 'A'     ||
+            steps.calcs.outputs.clean-percent > 70 && 'B+'    ||
+            steps.calcs.outputs.clean-percent > 60 && 'B'     ||
+            steps.calcs.outputs.clean-percent > 50 && 'C+'    ||
+            steps.calcs.outputs.clean-percent > 40 && 'C'     ||
+            steps.calcs.outputs.clean-percent > 30 && 'D'     ||
+            steps.calcs.outputs.clean-percent > 20 && 'F'     ||
+            'Brain Damage' }}
+          color: ${{
+            steps.calcs.outputs.clean-percent > 90 && 'green'              ||
+            steps.calcs.outputs.clean-percent > 80 && 'green,green,yellow' ||
+            steps.calcs.outputs.clean-percent > 70 && 'yellow'             ||
+            steps.calcs.outputs.clean-percent > 60 && 'orange,yellow'      ||
+            steps.calcs.outputs.clean-percent > 50 && 'orange'             ||
+            steps.calcs.outputs.clean-percent > 40 && 'red,orange'         ||
+            steps.calcs.outputs.clean-percent > 30 && 'red,red,orange'     ||
+            steps.calcs.outputs.clean-percent > 20 && 'red,red,red,orange' ||
+            'red' }}
+          path: .github/badges/grade_letter.svg
+
+      - name: "Generate Reading Level Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⚯ Reading Level"
+          # This is completely arbitrary
+          status: ${{
+            needs.FileStats.outputs.avg_word_length > 600 && 'Collegiate'   ||
+            needs.FileStats.outputs.avg_word_length > 586 && 'Senior'   ||
+            needs.FileStats.outputs.avg_word_length > 570 && 'Junior'   ||
+            needs.FileStats.outputs.avg_word_length > 551 && 'Sophomore'   ||
+            needs.FileStats.outputs.avg_word_length > 531 && 'Freshman'    ||
+            needs.FileStats.outputs.avg_word_length > 510 && '8th Grade'    ||
+            needs.FileStats.outputs.avg_word_length > 488 && '7th Grade'    ||
+            needs.FileStats.outputs.avg_word_length > 465 && '6th Grade'    ||
+            needs.FileStats.outputs.avg_word_length > 441 && '5th Grade'    ||
+            needs.FileStats.outputs.avg_word_length > 418 && '4th Grade'    ||
+            needs.FileStats.outputs.avg_word_length > 393 && '3rd Grade'    ||
+            needs.FileStats.outputs.avg_word_length > 368 && '2nd Grade'    ||
+            needs.FileStats.outputs.avg_word_length > 343 && '1st Grade'    ||
+            needs.FileStats.outputs.avg_word_length > 318 && '1st Grade'    ||
+            'Kindergarten' }}
+          color: ${{
+            needs.FileStats.outputs.avg_word_length > 600 && 'blue'                     ||
+            needs.FileStats.outputs.avg_word_length > 586 && 'green,blue'               ||
+            needs.FileStats.outputs.avg_word_length > 570 && 'green,green,blue'         ||
+            needs.FileStats.outputs.avg_word_length > 551 && 'green,green,green,blue'   ||
+            needs.FileStats.outputs.avg_word_length > 531 && 'green'                    ||
+            needs.FileStats.outputs.avg_word_length > 510 && 'yellow,green'             ||
+            needs.FileStats.outputs.avg_word_length > 488 && 'yellow,yellow,green'      ||
+            needs.FileStats.outputs.avg_word_length > 465 && 'yellow'                   ||
+            needs.FileStats.outputs.avg_word_length > 441 && 'orange,yellow'            ||
+            needs.FileStats.outputs.avg_word_length > 418 && 'orange,orange,yellow'     ||
+            needs.FileStats.outputs.avg_word_length > 393 && 'orange'                   ||
+            needs.FileStats.outputs.avg_word_length > 368 && 'red,orange'               ||
+            needs.FileStats.outputs.avg_word_length > 343 && 'red,red,orange'           ||
+            needs.FileStats.outputs.avg_word_length > 318 && 'red,red,red,orange'       ||
+            'red' }}
+          path: .github/badges/reading_level.svg
+
+      - name: "Generate DRY Score Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "🜲 Variable Score"
+          # This is completely arbitrary
+          status: ${{
+            steps.calcs.outputs.dry_score > 90 && '????'      ||
+            steps.calcs.outputs.dry_score > 50 && 'Godly'     ||
+            steps.calcs.outputs.dry_score > 40 && 'Insane'    ||
+            steps.calcs.outputs.dry_score > 25 && 'Great'     ||
+            steps.calcs.outputs.dry_score > 15 && 'Good'      ||
+            steps.calcs.outputs.dry_score > 10 && 'Decent'    ||
+            steps.calcs.outputs.dry_score > 7  && 'Fair'       ||
+            steps.calcs.outputs.dry_score > 3  && 'Poor'      ||
+            'Whats a variable?' }}
+          color: ${{
+            steps.calcs.outputs.dry_score > 90 && 'purple'            ||
+            steps.calcs.outputs.dry_score > 50 && 'yellow,orange'     ||
+            steps.calcs.outputs.dry_score > 40 && 'green'             ||
+            steps.calcs.outputs.dry_score > 25 && 'yellow,green'      ||
+            steps.calcs.outputs.dry_score > 15 && 'yellow'            ||
+            steps.calcs.outputs.dry_score > 10 && 'orange'            ||
+            steps.calcs.outputs.dry_score > 7  && 'red,orange'        ||
+            steps.calcs.outputs.dry_score > 3  && 'red'               ||
+            'black,red' }}
+          path: .github/badges/var_score.svg
+
+      - name: "Generate Swear Score Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⍤ Swear Score"
+          status: ${{
+            steps.calcs.outputs.swear_score > 40 && 'New Language'  ||
+            steps.calcs.outputs.swear_score > 10 && 'Sailor'        ||
+            steps.calcs.outputs.swear_score > 5 && 'Fresh outta HS' ||
+            steps.calcs.outputs.swear_score > 3 && 'PG-13'          ||
+            steps.calcs.outputs.swear_score > 1 && 'PG'             ||
+            'G'
+            }}
+          color: ${{
+            steps.calcs.outputs.swear_score > 40 && 'purple'            ||
+            steps.calcs.outputs.swear_score > 10 && 'yellow,orange'     ||
+            steps.calcs.outputs.swear_score > 5 && 'orange,yellow'      ||
+            steps.calcs.outputs.swear_score > 3 && 'yellow,green'       ||
+            steps.calcs.outputs.swear_score > 1 && 'yellow,green,green' ||
+            'green'
+            }}
+          path: .github/badges/swear_score.svg
+
+      - name: "Generate Swear Count Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⍣ Swear Count"
+          status: "${{ needs.FileStats.outputs.swear_words }}"
+          color: ${{
+            needs.FileStats.outputs.swear_words > 99 && 'red'          ||
+            needs.FileStats.outputs.swear_words > 69 && 'orange,red'       ||
+            needs.FileStats.outputs.swear_words > 49 && 'orange'       ||
+            needs.FileStats.outputs.swear_words > 29 && 'yellow,orange'    ||
+            needs.FileStats.outputs.swear_words > 19 && 'yellow'       ||
+            needs.FileStats.outputs.swear_words > 9 && 'yellow,green'       ||
+            'green' }}
+          path: .github/badges/swear_count.svg
+
+      - name: "Generate Whitespace Coverage Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⎵ Whitespace Coverage"
+          status: "${{ steps.calcs.outputs.whitespace_score }}%"
+          color: ${{
+            steps.calcs.outputs.whitespace_score > 90 && 'green'              ||
+            steps.calcs.outputs.whitespace_score > 80 && 'green,green,yellow' ||
+            steps.calcs.outputs.whitespace_score > 70 && 'yellow'             ||
+            steps.calcs.outputs.whitespace_score > 60 && 'orange,yellow'      ||
+            steps.calcs.outputs.whitespace_score > 50 && 'orange'             ||
+            steps.calcs.outputs.whitespace_score > 40 && 'red,orange'         ||
+            steps.calcs.outputs.whitespace_score > 30 && 'red,red,orange'     ||
+            steps.calcs.outputs.whitespace_score > 20 && 'red,red,red,orange'  ||
+            'red' }}
+          path: .github/badges/whitespace_coverage.svg
+
+      - name: "Generate Whitspace Size Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⟷ Whitespace Size"
+          status: "${{ steps.calcs.outputs.whitespace_size_str }}c"
+          color: ${{
+            steps.calcs.outputs.whitespace_size > 350 && 'yellow'              ||
+            steps.calcs.outputs.whitespace_size > 250 && 'green,green,yellow'  ||
+            steps.calcs.outputs.whitespace_size > 180 && 'green'               ||
+            steps.calcs.outputs.whitespace_size > 170 && 'green,green,yellow'  ||
+            steps.calcs.outputs.whitespace_size > 160 && 'yellow'              ||
+            steps.calcs.outputs.whitespace_size > 150 && 'orange,yellow'       ||
+            steps.calcs.outputs.whitespace_size > 140 && 'orange'              ||
+            steps.calcs.outputs.whitespace_size > 130 && 'red,orange'          ||
+            steps.calcs.outputs.whitespace_size > 120 && 'red,red,orange'      ||
+            steps.calcs.outputs.whitespace_size > 110 && 'red,red,red,orange'  ||
+            'red' }}
+          path: .github/badges/whitespace_size.svg
+
+      - name: "Generate Avg Line Length Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "𝌢 Line Length"
+          status: "${{ steps.calcs.outputs.avg_line_len }}c"
+          color: ${{
+            steps.calcs.outputs.avg_line_len > 100 && 'red'                     ||
+            steps.calcs.outputs.avg_line_len > 90  && 'red,red,orange'          ||
+            steps.calcs.outputs.avg_line_len > 80  && 'orange'                  ||
+            steps.calcs.outputs.avg_line_len > 70  && 'orange,orange,yellow'    ||
+            steps.calcs.outputs.avg_line_len > 60  && 'orange,yellow'           ||
+            steps.calcs.outputs.avg_line_len > 50  && 'yellow'                  ||
+            steps.calcs.outputs.avg_line_len > 40  && 'yellow,yellow,green'     ||
+            steps.calcs.outputs.avg_line_len > 30  && 'yellow,green'            ||
+            steps.calcs.outputs.avg_line_len > 20  && 'green'                   ||
+            'orange,yellow' }}
+          path: .github/badges/line_length.svg
+
+      - name: "Generate Insanity Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "ඞ Insanity"
+          status: ${{
+            steps.calcs.outputs.sanity_score > 90 && 'Based'                  ||
+            steps.calcs.outputs.sanity_score > 60 && 'Average Joe'            ||
+            steps.calcs.outputs.sanity_score > 50 && 'Lambda Appreciator'     ||
+            steps.calcs.outputs.sanity_score > 40 && 'Lambda Enthusiast'      ||
+            steps.calcs.outputs.sanity_score > 30 && 'Knocked on the Head'    ||
+            steps.calcs.outputs.sanity_score > 20 && 'Insane'                 ||
+            steps.calcs.outputs.sanity_score > 10 && 'Clinical'               ||
+            'Lovecrafts Disciple' }}
+          color: ${{
+            steps.calcs.outputs.sanity_score > 90 && 'green'                  ||
+            steps.calcs.outputs.sanity_score > 60 && 'green,green,yellow'     ||
+            steps.calcs.outputs.sanity_score > 50 && 'green,yellow'           ||
+            steps.calcs.outputs.sanity_score > 40 && 'yellow'                 ||
+            steps.calcs.outputs.sanity_score > 30 && 'orange,yellow'          ||
+            steps.calcs.outputs.sanity_score > 20 && 'red,orange'             ||
+            steps.calcs.outputs.sanity_score > 10 && 'red'                    ||
+            'purple,green' }}
+          path: .github/badges/insanity.svg
+
+      - name: "Generate File Count Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "⍞ File Count"
+          status: "${{ needs.FileStats.outputs.file_count }}"
+          color: ${{
+            needs.FileStats.outputs.file_count > 1000 && 'red'                     ||
+            needs.FileStats.outputs.file_count > 500  && 'red,red,orange'          ||
+            needs.FileStats.outputs.file_count > 300  && 'orange'                  ||
+            needs.FileStats.outputs.file_count > 200  && 'orange,orange,yellow'    ||
+            needs.FileStats.outputs.file_count > 100  && 'orange,yellow'           ||
+            needs.FileStats.outputs.file_count > 50   && 'yellow'                  ||
+            needs.FileStats.outputs.file_count > 20   && 'yellow,yellow,green'     ||
+            needs.FileStats.outputs.file_count > 10   && 'yellow,green'            ||
+            'green' }}
+          path: .github/badges/file_count.svg
+
+      - name: "Generate File Count Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: "𝘛 Text Files"
+          status: "${{ needs.FileStats.outputs.text_file_count }}"
+          color: ${{
+            needs.FileStats.outputs.text_file_count > 1000 && 'red'                     ||
+            needs.FileStats.outputs.text_file_count > 500  && 'red,red,orange'          ||
+            needs.FileStats.outputs.text_file_count > 300  && 'orange'                  ||
+            needs.FileStats.outputs.text_file_count > 200  && 'orange,orange,yellow'    ||
+            needs.FileStats.outputs.text_file_count > 100  && 'orange,yellow'           ||
+            needs.FileStats.outputs.text_file_count > 50   && 'yellow'                  ||
+            needs.FileStats.outputs.text_file_count > 20   && 'yellow,yellow,green'     ||
+            needs.FileStats.outputs.text_file_count > 10   && 'yellow,green'            ||
+            'green' }}
+          path: .github/badges/text_file_count.svg
+
+      - name: "Generate Pic Badge"
+        uses: emibcn/badge-action@v1
+        with:
+          label: ${{ steps.calcs.outputs.pic_str_1 }}
+          status: ${{ steps.calcs.outputs.pic_str_2 }}
+          color: ${{
+            steps.calcs.outputs.pics > 10 && 'purple'         ||
+            steps.calcs.outputs.pics > 3  && 'green'          ||
+            steps.calcs.outputs.pics > 2  && 'yellow'         ||
+            steps.calcs.outputs.pics > 1  && 'orange,yellow'  ||
+            steps.calcs.outputs.pics > 0  && 'orange'         ||
+            'red' }}
+          path: .github/badges/pics.svg
+
+      - name: push
+        uses: actions-x/commit@v5
+        with:
+          message: "Update Badges"
+          email: actions@github.com
+          name: GitHub Actions
+
+  CommentBadges:
+    # TODO: finish https://github.com/emibcn/pywisp/blob/master/.github/workflows/test.yml#L178
+    name: Comment on PR with generated badge
+    needs: [GenBadges]
+    if: ${{ github.event_name == 'pull_request' && github.actor == github.repository_owner }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate comment file with all the badges
+        shell: bash
+        env:
+          BADGE: ${{ needs.badge.outputs.markdown }}
+        run: |
+          echo "Badge: ${BADGE}"
+          echo "${BADGE}" > output.md
+
+      - name: Comment PR with test coverage badge
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: output.md

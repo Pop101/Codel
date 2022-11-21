@@ -1,0 +1,221 @@
+* {
+    margin: 0px;
+}
+
+body {
+    display: flex;
+    overflow-x: hidden;
+    font-family: 'Lato', sans-serif;
+    min-height: 100vh;
+
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+
+    color: white;
+    background: linear-gradient(147deg, #000000 15%, #232323 90%);
+
+    font-size: large;
+}
+
+#editor-box {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+
+    background: var(--color-background);
+    border-radius: 5px;
+
+    overflow: hidden;
+}
+
+.sidebar {
+    flex: 1 1 auto;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.content {
+    flex: 1 1 auto;
+    padding: 50px;
+
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    flex-direction: column;
+
+    gap: 3vh;
+}
+
+h1 {
+    text-align: center;
+
+    margin-left: 3vmax;
+    margin-top: 3vmax;
+}
+
+img {
+    width: 100%;
+    height: 100%;
+    min-width: 100px;
+}
+
+button,
+.btn {
+    padding: 1vh 1vw;
+    border: var(--color-background) solid 2px;
+    border-radius: 1vmin;
+
+    background: transparent;
+
+    color: white;
+    font-size: large;
+    cursor: pointer;
+}
+
+.editor-bar {
+    flex: 0 1 auto;
+    padding: 10px;
+    background: linear-gradient(315deg, #eb4511 0%, #b02e0c 74%);
+    ;
+}
+
+.slick {
+    padding: 1em;
+    margin: 2em;
+}
+
+.guess-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    /* justify-content: space-between; */
+    gap: 0.5em;
+}
+
+.guess {
+    height: max(4vh, 3vw, 7ch);
+    width: max(4vh, 3vw, 7ch);
+    line-height: max(4vh, 3vw, 7ch);
+    padding: 0.5em;
+    font-size: small;
+    text-align: center;
+
+    background: gray;
+    position: relative;
+
+}
+
+.guess.incorrect {
+    background: red;
+}
+
+.guess.correct {
+    background: green;
+}
+
+.guess.inprogress::after {
+    content: "";
+    background-image: url("/static/img/spin.svg");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: brightness(0) invert(1);
+
+    position: absolute;
+    top: 30%;
+    left: 30%;
+    width: 40%;
+    height: 40%;
+}
+
+.guess .tooltip {
+    visibility: hidden;
+    position: absolute;
+    z-index: 5;
+
+    width: 50ch;
+    color: white;
+    font-size: 12px;
+    line-height: normal;
+    background-color: #192733;
+    border-radius: 10px;
+    padding: 10px 15px 10px 15px;
+
+}
+
+.guess:hover .tooltip {
+    visibility: visible;
+}
+
+.run {
+    color: limegreen;
+}
+
+.pad {
+    padding: 3vmax 3vmin;
+}
+
+.flex {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    gap: 5vmax;
+}
+
+.flex * {
+    flex: 1;
+}
+
+@media (max-width: 800px) {
+    body {
+        flex-direction: column;
+    }
+
+    .content {
+        flex: 5;
+        flex-direction: row-reverse;
+    }
+
+    .guess-bar {
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .guess {
+        padding: 1em;
+    }
+
+    .guess .tooltip {
+        top: -8px;
+        right: 120%;
+    }
+
+    .flex {
+        flex-direction: column-reverse;
+    }
+
+    img {
+        max-height: 100px;
+        width: unset;
+    }
+}
+
+@media(min-width: 801px) {
+    h1 {
+        /* text direction */
+        writing-mode: vertical-rl;
+        text-orientation: sideways;
+        transform: rotate(180deg);
+        font-size: 70px;
+    }
+
+    .guess .tooltip {
+        bottom: -8px;
+        left: -20ch;
+    }
+}
