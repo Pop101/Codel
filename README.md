@@ -1,16 +1,5 @@
 # Codel: Wordle but with Code
 
-[<img alt="Commit Count" src=".github/badges/commit_count.svg" />](../../commits/main)
-[<img alt="Contributor Count" src=".github/badges/contributor_count.svg" />](../../contributors)
-[<img alt="File Count" src=".github/badges/text_file_count.svg" />](../..)
-[<img alt="Line Length" src=".github/badges/line_length.svg" />](../..)
-[<img alt="Lines of Code" src=".github/badges/lines_of_code.svg" />](../..)
-[<img alt="Lines per PR" src=".github/badges/lines_per_pr.svg" />](../../issues)
-[<img alt="Merges" src=".github/badges/merge_count.svg" />](../../pulls)
-[<img alt="Pics" src=".github/badges/pics.svg" />](../..)
-[<img alt="PR Issues" src=".github/badges/pr_issue_count.svg" />](../../issues)
-[<img alt="Reading Level" src=".github/badges/reading_level.svg" />](../..)
-
 Know too many programming languages? I don't, but if you do, take a try to guess the language!
 
 ## Table of Contents
@@ -26,7 +15,7 @@ Know too many programming languages? I don't, but if you do, take a try to guess
 
 This is a wordle clone with a twist: print "Hello World" in a completely unknown language! You have 5 guesses to get it right. If you don't, you can always try again.
 
-![Screenshot](.github/images/screenshot.png)
+![Screenshot](.github/screenshot.png)
 
 ## Technologies
 
