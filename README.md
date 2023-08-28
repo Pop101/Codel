@@ -32,12 +32,15 @@ This project is created with:
 This repo just makes sick badges, but for most repos, use the following:
 
 Clone the Repo \
-```git clone https://github.com/Pop101/Codel``` \
+```git clone https://github.com/Pop101/Codel```
+
 Enter the repo and Install requirements \
-```cd Codel && sudo python3 -m pip install -r requirements```
+```cd Codel
+poetry install
+```
 
 Launch the webserver \
-```python3 webserver.py```
+```poetry run python3 webserver.py```
 
 ## Usage
 
