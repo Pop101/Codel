@@ -1,48 +1,32 @@
-# Codel: Wordle but with Code
+# Codel
 
-Know too many programming languages? I don't, but if you do, take a try to guess the language!
+Print “Hello World” in a mystery programming language. You get five guesses.
+
+![Codel game screen](.github/screenshot.png)
 
 ## Table of Contents
 
-- [Codel: Wordle but with Code](#codel-wordle-but-with-code)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-  - [Technologies](#technologies)
-  - [Getting Started](#getting-started)
-  - [Usage](#usage)
+- [How to play](#how-to-play)
+- [Run locally](#run-locally)
+- [Technologies](#technologies)
 
-## Overview
+## How to play
 
-This is a wordle clone with a twist: print "Hello World" in a completely unknown language! You have 5 guesses to get it right. If you don't, you can always try again.
+Enter a program that prints `Hello World`, then submit it. Codel sends your code to Piston for evaluation. Don't put secrets or private code in your guesses.
 
-![Screenshot](.github/screenshot.png)
+## Run locally
+
+From the repository root, install dependencies with Poetry and start the web server:
+
+```sh
+poetry install
+poetry run python webserver.py
+```
+
+Open `http://localhost:8787`. The server can start separately from the execution backend. The checked-in integration does not send the authorization now required by the public Piston endpoint, so a clean checkout is not a working end-to-end demo.
 
 ## Technologies
 
-This project is created with:
-
-- [Flask](https://flask.palletsprojects.com/en/2.0.x/): 2.0.2
-- [Piston API](https://github.com/engineer-man/piston): v2
-- [Waitress](https://docs.pylonsproject.org/projects/waitress/en/stable/): 2.1.2
-- [Twimoji](https://github.com/twitter/twemoji)
-- [SVG Spinners](https://github.com/n3r4zzurr0/svg-spinners)
-  
-## Getting Started
-
-This repo just makes sick badges, but for most repos, use the following:
-
-Clone the Repo \
-```git clone https://github.com/Pop101/Codel```
-
-Enter the repo and Install requirements \
-```cd Codel
-poetry install
-```
-
-Launch the webserver \
-```poetry run python3 webserver.py```
-
-## Usage
-
-Just connect to the webserver and start guessing! \
-```http://localhost:8787```
+- [Flask](https://flask.palletsprojects.com/) and [Waitress](https://docs.pylonsproject.org/projects/waitress/en/stable/) serve the game.
+- [Piston](https://github.com/engineer-man/piston) evaluates submitted code.
+- [Twemoji](https://github.com/twitter/twemoji) and [SVG Spinners](https://github.com/n3r4zzurr0/svg-spinners) provide artwork and loading indicators.
